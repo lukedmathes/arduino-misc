@@ -144,12 +144,21 @@
 #define LCD_BACKLIGHT_ON()      digitalWrite( LCD_BACKLIGHT_PIN, HIGH )
 #define LCD_BACKLIGHT(state)    { if( state ){digitalWrite( LCD_BACKLIGHT_PIN, HIGH );}else{digitalWrite( LCD_BACKLIGHT_PIN, LOW );} }
 // Defines for menu options
-#define OPTION_PLAY             1
-#define OPTION_HOW_TO           2
+#define OPTION_ONE             1
+#define OPTION_TWO             2
+// Mask for debouncing 0b00111111
+#define DEBOUNCE_BIT_MASK 0x3f
+// For draw_new_cards function
+#define NEW_HAND              1
+#define NEW_CARD              2
+#define BLACKJACK_SCORE       50
+#define FIVE_UNDER_SCORE      40
+#define BUST_SCORE            30
 /*--------------------------------------------------------------------------------------
   Variables
   --------------------------------------------------------------------------------------*/
 
+const char * const cards_strings[] = { "F", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
 
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
@@ -169,6 +178,13 @@ void setup() {
   pinMode( LCD_BACKLIGHT_PIN, OUTPUT );     //D3 is an output
   //set up the LCD number of columns and rows:
   lcd.begin( 16, 2 );
+  // Initialise random seed
+  /*
+  pinMode( A2, INPUT);
+  digitalWrite( BUTTON_ADC_PIN, LOW );
+  randomSeed(analogRead(A2));
+  pinMode( A2, OUTPUT);
+  */
 }
 
 /*--------------------------------------------------------------------------------------
@@ -177,49 +193,20 @@ void setup() {
   --------------------------------------------------------------------------------------*/
 void loop() {
   // put your main code here, to run repeatedly:
+  clear_lcd();
   lcd.setCursor( 3, 0 );
   lcd.print( "BLACKJACK" );
   lcd.setCursor( 0, 1 );
   lcd.print( "*Play   How to" );
 
-  byte menu_selected = OPTION_PLAY;
-  byte read_input = ReadButtons();
-  while (BUTTON_SELECT != read_input)
-  {
-    switch (read_input)
-    {
-      case BUTTON_RIGHT:
-      case BUTTON_LEFT:
-      case BUTTON_UP:
-      case BUTTON_DOWN:
-        if (OPTION_PLAY == menu_selected)
-        {
-          lcd.setCursor( 0, 1 );
-          lcd.print(" ");
-          lcd.setCursor( 7, 1 );
-          lcd.print("*");
-          menu_selected = OPTION_HOW_TO;
-        } else
-        {
-          lcd.setCursor( 7, 1 );
-          lcd.print(" ");
-          lcd.setCursor( 0, 1 );
-          lcd.print("*");
-          menu_selected = OPTION_PLAY;
-        }
-        break;
-      case BUTTON_NONE:
-      default:
-        break;
-    }
-    read_input = ReadButtons();
-  }
+  // OPTION_ONE is "Play", OPTION_TWO is "How to"
+  byte menu_selected = query_user_input( 0, 1, 7, 1 );
 
-  if (OPTION_PLAY == menu_selected)
+  if (OPTION_ONE == menu_selected)
   {
     blackjack();
   }
-  else if (OPTION_HOW_TO == menu_selected)
+  else if (OPTION_TWO == menu_selected)
   {
     how_to();
   }
@@ -240,10 +227,209 @@ void loop() {
 
   --------------------------------------------------------------------------------------*/
 void blackjack() {
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Blackjack game" );
-  while (BUTTON_SELECT != ReadButtons());
+  do
+  {
+    byte player_total = 1;
+    byte dealer_total = 1;  // Initialise to 1 so if player busts and their score set to 0 for comparison, dealer still wins
+    // Player turn
+    clear_lcd();
+    lcd.setCursor( 0, 0 );
+    lcd.print( "Player:" );
+    player_total = draw_new_cards(NEW_HAND);
+    while (21 >= player_total)
+    {
+      lcd.setCursor( 7, 0 );
+      lcd.print( " *Hit Sit" );
+      if( OPTION_ONE == query_user_input( 8, 0, 12, 0 ) )
+      {
+        //Hit
+        player_total = draw_new_cards(NEW_CARD);
+      }
+      else
+      {
+        break;
+      }
+    }
+    
+    if (BUST_SCORE != player_total)   // If player busted, skip to winner calculation
+    {
+      // Dealer turn
+      clear_lcd();
+      lcd.setCursor( 0, 0 );
+      lcd.print( "Dealer:" );
+      dealer_total = draw_new_cards(NEW_HAND);
+      while (21 >= dealer_total)
+      {
+        lcd.setCursor( 7, 0 );
+        lcd.print( "         " );
+        if( 17 > dealer_total )
+        {
+          //Hit
+          lcd.setCursor( 7, 0 );
+          lcd.print( "      Hit" );
+          while (BUTTON_SELECT != ReadButtons());
+          dealer_total = draw_new_cards(NEW_CARD);
+        }
+        else
+        {
+          lcd.setCursor( 7, 0 );
+          lcd.print( "      Sit" );
+          while (BUTTON_SELECT != ReadButtons());
+          break;
+        }
+      }
+    }
+    // Set scores to zero if busted so a simple greater than comparison can be used
+    if (BUST_SCORE == player_total)
+    {
+      player_total = 0;
+    }
+    if (BUST_SCORE == dealer_total)
+    {
+      dealer_total = 0;
+    }
+    
+    clear_lcd();
+    if ( player_total > dealer_total)
+    {
+      lcd.setCursor( 0, 0 );
+      lcd.print("You win!");
+    }
+    else if ( dealer_total > player_total)
+    {
+      lcd.setCursor( 0, 0 );
+      lcd.print("You lose");
+    }
+    else
+    {
+      lcd.setCursor( 0, 0 );
+      lcd.print("Draw");
+    }
+    
+    lcd.setCursor( 13, 0 );
+    lcd.print("Yes");
+    lcd.setCursor( 0, 1 );
+    lcd.print("Play again?   No" );
+  } while (OPTION_TWO != query_user_input( 12, 0, 13, 1));
+
 }
+
+
+/*--------------------------------------------------------------------------------------
+  draw_new_cards()
+    Descriptions:
+      
+    Inputs:
+      Indicator of whether cards are being drawn to a new hand or to an existing hand
+    Outputs:
+      
+  --------------------------------------------------------------------------------------*/
+byte draw_new_cards( const byte new_hand_or_card )
+{
+  static byte hand[5] = {0};
+  static byte number_of_cards = 0;
+  static byte cursor_pointer = 15;           // End of screen
+  byte total = 0;
+  byte ace_count = 0;
+
+  if(NEW_HAND == new_hand_or_card)
+  {
+    memset( hand, 0, 5);
+    number_of_cards = 0;
+    cursor_pointer = 15;
+    draw_and_print( &(hand[number_of_cards++]), &cursor_pointer );
+  }
+  draw_and_print( &(hand[number_of_cards++]), &cursor_pointer );
+
+  for ( byte i = 0; i < number_of_cards; i++)
+  {
+    if (10 < hand[i] )      // Picture card
+    {
+      total += 10;
+    }
+    else if ( 1 < hand[i])  // 2-10 card
+    {
+      total += hand[i];
+    }
+    else                    // Ace
+    {
+      total += 11;
+      ace_count++;
+    }
+  }
+  // Print current total to bottom left corner
+  lcd.setCursor( 0, 1);
+  lcd.print(total);
+  // Check if Blackjack or if Ace acting as 11 should act as 1
+  if (0 < ace_count)
+  {
+    while ( ( 21 < total ) && (0 < ace_count))
+    {
+      total -= 10;
+      ace_count --;
+    }
+    // Update after changing Ace value
+    lcd.setCursor( 0, 1);
+    lcd.print(total);
+    
+    if ((2 == number_of_cards) && (21 == total))
+    {
+      // Blackjack
+      lcd.setCursor( 7, 0 );
+      lcd.print("Blackjack");
+      while (BUTTON_SELECT != ReadButtons());
+      return BLACKJACK_SCORE;
+    }
+  }
+
+  if (21 < total)
+  {
+    // Bust
+    lcd.setCursor( 7, 0 );
+    lcd.print("     Bust");
+    while (BUTTON_SELECT != ReadButtons());
+    return BUST_SCORE;
+  }
+  if (5 <= number_of_cards)       // To reach this point, total must be below 21        
+  {
+    // 5 under
+    lcd.setCursor( 7, 0 );
+    lcd.print("  5 Under");
+    while (BUTTON_SELECT != ReadButtons());
+    return FIVE_UNDER_SCORE;
+  }
+  return total;
+  
+}
+
+
+/*--------------------------------------------------------------------------------------
+  draw_new_cards()
+    Descriptions:
+      Creates a random card and places it in the given location. Keeps track of cursor pointer and prints
+      to the appropriate location on screen.
+    Inputs:
+      Pointer to card location.
+      Pointer to cursor location.
+    Outputs:
+      Updates cursor location
+      Places new card in card location
+      Prints card to screen
+  --------------------------------------------------------------------------------------*/
+void draw_and_print( byte *card, byte *cursor_pointer )
+{
+  *card = random(1,14);
+  if (10 == *card)
+  {
+    (*cursor_pointer)--;
+  }
+  lcd.setCursor( *cursor_pointer, 1);
+  lcd.print( cards_strings[*card]);
+  (*cursor_pointer)--;
+  (*cursor_pointer)--;
+}
+
+
 
 
 /*--------------------------------------------------------------------------------------
@@ -252,10 +438,21 @@ void blackjack() {
 
   --------------------------------------------------------------------------------------*/
 void how_to() {
+  clear_lcd();
   lcd.setCursor( 0, 0 );
   lcd.print( "How to play" );
   while (BUTTON_SELECT != ReadButtons());
 }
+
+
+
+void clear_lcd() {
+  lcd.setCursor( 0, 0 );
+  lcd.print( "                " );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "                " );
+}
+
 
 
 /*--------------------------------------------------------------------------------------
@@ -269,6 +466,7 @@ byte ReadButtons()
   unsigned int buttonVoltage;
   byte button = BUTTON_NONE;   // return no button pressed if the below checks don't write to btn
   static byte buttonWas          = BUTTON_NONE;   //used by ReadButtons() for detection of button events
+  static byte debounce_detection = 0;
 
   //read the button ADC pin voltage
   buttonVoltage = analogRead( BUTTON_ADC_PIN );
@@ -297,15 +495,79 @@ byte ReadButtons()
   {
     button = BUTTON_SELECT;
   }
-  // Only return the pressed button if it was a rising edge
-  if ( buttonWas == BUTTON_NONE )
+
+  // Debouncing. Shift bits until 7 straight detections after
+  debounce_detection << 1;
+  if (buttonWas != button)
   {
+    debounce_detection++;
+    delay(1);
+  }
+
+  if ( DEBOUNCE_BIT_MASK == debounce_detection)
+  {
+    debounce_detection = 0;
     buttonWas = button;
     return ( button );
   }
-
-  // save the latest button value, for change event detection next time round
-  buttonWas = button;
-  // Return no button pressed if not a rising edge
+  // If not a rising edge debounce
   return ( BUTTON_NONE );
 }
+
+
+/*--------------------------------------------------------------------------------------
+  query_user_input()
+    Descriptions:
+      Moves the cursor between two given locations and waits until the user selects one.
+      Can be used for any two cursor locations provided the code has already printed the options to screen.
+    Inputs:
+      X and Y locations for two points to place an asterisk indicating the selected option.
+    Outputs:
+      Prints asterisk to screen, other functions required to clear asterisk.
+      Returns either the constant OPTION_ONE or OPTION_TWO depending on user choice.
+  --------------------------------------------------------------------------------------*/
+byte query_user_input(byte one_x, byte one_y, byte two_x, byte two_y)
+{
+  byte button_pressed = BUTTON_NONE;
+  byte option_selected = OPTION_ONE;
+  // Set default cursor position
+  lcd.setCursor( one_x, one_y );
+  lcd.print("*");
+  lcd.setCursor( two_x, two_y );
+  lcd.print(" ");
+
+  do
+  {
+    button_pressed = ReadButtons();
+    switch (button_pressed)
+    {
+      case BUTTON_RIGHT:
+      case BUTTON_LEFT:
+      case BUTTON_UP:
+      case BUTTON_DOWN:
+        if (OPTION_ONE == option_selected)
+        {
+          // Change from option one to option two
+          lcd.setCursor( one_x, one_y );
+          lcd.print(" ");
+          lcd.setCursor( two_x, two_y );
+          lcd.print("*");
+          option_selected = OPTION_TWO;
+        } else
+        {
+          // Change from option two to option one
+          lcd.setCursor( two_x, two_y );
+          lcd.print(" ");
+          lcd.setCursor( one_x, one_y );
+          lcd.print("*");
+          option_selected = OPTION_ONE;
+        }
+        break;
+      case BUTTON_NONE:
+      default:
+        break;
+    }
+  } while (BUTTON_SELECT != button_pressed);
+  return option_selected;
+}
+
