@@ -3,7 +3,7 @@
   BlackJack game for Arduino Due and Duinotech XC-4454 LC Controller
 
 
-  By Luke Mathes, 11 March 2016
+  By Luke Mathes, 14 March 2016
 
   Uses modified example code from Marc Alexander
       http://www.freetronics.com/products/lcd-keypad-shield
@@ -108,8 +108,6 @@
 	HYSTERESIS:	+- 10 bits
 
 
-
-
   -------------------------------------------------------------------- */
 
 
@@ -157,9 +155,7 @@
 /*--------------------------------------------------------------------------------------
   Variables
   --------------------------------------------------------------------------------------*/
-
 const char * const cards_strings[] = { "F", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
-
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
   --------------------------------------------------------------------------------------*/
@@ -179,12 +175,12 @@ void setup() {
   //set up the LCD number of columns and rows:
   lcd.begin( 16, 2 );
   // Initialise random seed
-  /*
-  pinMode( A2, INPUT);
-  digitalWrite( BUTTON_ADC_PIN, LOW );
-  randomSeed(analogRead(A2));
-  pinMode( A2, OUTPUT);
-  */
+  pinMode( A1, INPUT);
+  digitalWrite( A1, LOW );
+  randomSeed( analogRead(A1) );
+  digitalWrite( A1, HIGH );
+  pinMode( A1, OUTPUT);
+  
 }
 
 /*--------------------------------------------------------------------------------------
@@ -222,9 +218,16 @@ void loop() {
 
 /*--------------------------------------------------------------------------------------
   blackjack()
-  The main Blackjack game function.
-  Will only exit once user completes game and selects to not play again.
-
+  Description:
+    The main Blackjack game function.
+    Loops between player turn and dealer turn until the player chooses not to play again.
+    Drawing and displaying of cards is handled by draw_new_cards function while blackjack handles turn order,
+    "Hit" or "Sit" decisions, and winnder checking.
+  Inputs:
+    User input to decide to play again or to take another card during the player turn.
+  Outputs:
+    Prints to LCD screen who is playing and what options are available/have been taken by the dealer and who won.
+    Through draw_new_card, prints the cards and score to LCD screen.
   --------------------------------------------------------------------------------------*/
 void blackjack() {
   do
@@ -262,9 +265,10 @@ void blackjack() {
       {
         lcd.setCursor( 7, 0 );
         lcd.print( "         " );
+        // Dealer follows Casino rules and will hit on any total 16 and below
         if( 17 > dealer_total )
         {
-          //Hit
+          // Hit
           lcd.setCursor( 7, 0 );
           lcd.print( "      Hit" );
           while (BUTTON_SELECT != ReadButtons());
@@ -272,6 +276,7 @@ void blackjack() {
         }
         else
         {
+          // Sit
           lcd.setCursor( 7, 0 );
           lcd.print( "      Sit" );
           while (BUTTON_SELECT != ReadButtons());
@@ -288,7 +293,7 @@ void blackjack() {
     {
       dealer_total = 0;
     }
-    
+    // Determine who won and print to screen.
     clear_lcd();
     if ( player_total > dealer_total)
     {
@@ -305,7 +310,7 @@ void blackjack() {
       lcd.setCursor( 0, 0 );
       lcd.print("Draw");
     }
-    
+    // Ask user if they would like to play again while result is still on screen
     lcd.setCursor( 13, 0 );
     lcd.print("Yes");
     lcd.setCursor( 0, 1 );
@@ -317,23 +322,27 @@ void blackjack() {
 
 /*--------------------------------------------------------------------------------------
   draw_new_cards()
-    Descriptions:
-      
+    Description:
+      Function stores the cards the current player has in a static array, adds a new card when called,
+      and prints the cards and total to the screen. Function also returns the hand total so that the caller
+      function can keep track of score.
     Inputs:
       Indicator of whether cards are being drawn to a new hand or to an existing hand
     Outputs:
-      
+      Prints cards and total to LCD screen.
+      Returns card total or a constant of special value if certain conditions are met.
   --------------------------------------------------------------------------------------*/
 byte draw_new_cards( const byte new_hand_or_card )
 {
   static byte hand[5] = {0};
   static byte number_of_cards = 0;
-  static byte cursor_pointer = 15;           // End of screen
+  static byte cursor_pointer = 15;           // 15 is end of screen
   byte total = 0;
   byte ace_count = 0;
 
   if(NEW_HAND == new_hand_or_card)
   {
+    // Clear hand, number of cards and cursor pointer, then draw an additional card
     memset( hand, 0, 5);
     number_of_cards = 0;
     cursor_pointer = 15;
@@ -399,15 +408,13 @@ byte draw_new_cards( const byte new_hand_or_card )
     return FIVE_UNDER_SCORE;
   }
   return total;
-  
 }
-
 
 /*--------------------------------------------------------------------------------------
   draw_new_cards()
     Descriptions:
       Creates a random card and places it in the given location. Keeps track of cursor pointer and prints
-      to the appropriate location on screen.
+      to the appropriate location on screen. 
     Inputs:
       Pointer to card location.
       Pointer to cursor location.
@@ -419,17 +426,17 @@ byte draw_new_cards( const byte new_hand_or_card )
 void draw_and_print( byte *card, byte *cursor_pointer )
 {
   *card = random(1,14);
+  // 10 is the only card of 2 characters, so decrement the cursor pointer once more before printing
   if (10 == *card)
   {
     (*cursor_pointer)--;
   }
   lcd.setCursor( *cursor_pointer, 1);
+  // card_strings is constant string array that is unchanged for 2-10, but 11-13 are J,Q and K while 1 is A
   lcd.print( cards_strings[*card]);
-  (*cursor_pointer)--;
-  (*cursor_pointer)--;
+  // Place a gap between current card and location of next card
+  (*cursor_pointer) -= 2;
 }
-
-
 
 
 /*--------------------------------------------------------------------------------------
@@ -440,12 +447,159 @@ void draw_and_print( byte *card, byte *cursor_pointer )
 void how_to() {
   clear_lcd();
   lcd.setCursor( 0, 0 );
-  lcd.print( "How to play" );
+  lcd.print( "  How to play" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "  Press select" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Select Hit to" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "draw a new card" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Try to get your" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "total to 21" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "But if you go" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "over, you bust!" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Try it now." );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "Select Hit" );
+  while (BUTTON_SELECT != ReadButtons());
+  while(1)
+  {
+    clear_lcd();
+    lcd.setCursor( 0, 0 );
+    lcd.print( "Player: *Hit Sit" );
+    lcd.setCursor( 0, 1 );
+    lcd.print( "11           6 5" );
+    if( OPTION_ONE == query_user_input( 8, 0, 12, 0 ) )
+    {
+      break;
+    }
+    else
+    {
+      clear_lcd();
+     lcd.setCursor( 0, 0 );
+      lcd.print( "11 is a bit low" );
+      lcd.setCursor( 0, 1 );
+      lcd.print( "Try choosing Hit" );
+      while (BUTTON_SELECT != ReadButtons());
+    }
+  }
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Player:  Hit Sit" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "21        10 6 5" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Good job, 21!" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "Now select Sit." );
+  while (BUTTON_SELECT != ReadButtons());
+  while(1)
+  {
+    clear_lcd();
+    lcd.setCursor( 0, 0 );
+    lcd.print( "Player: *Hit Sit" );
+    lcd.setCursor( 0, 1 );
+    lcd.print( "21        10 6 5" );
+    if( OPTION_TWO == query_user_input( 8, 0, 12, 0 ) )
+    {
+      break;
+    }
+    else
+    {
+      clear_lcd();
+      lcd.setCursor( 0, 0 );
+      lcd.print( "Player:     Bust" );
+      lcd.setCursor( 0, 1 );
+      lcd.print( "28      7 10 6 5" );
+      while (BUTTON_SELECT != ReadButtons());
+      
+      clear_lcd();
+      lcd.setCursor( 0, 0 );
+      lcd.print( "Oh no, Bust!" );
+      lcd.setCursor( 0, 1 );
+      lcd.print( "Try choosing Sit" );
+      while (BUTTON_SELECT != ReadButtons());
+    }
+  }
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Not a bad first" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "hand." );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "You don't always" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "need exactly 21" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "You just have to" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "beat the dealer" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Dealer:      Hit" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "15           5 K" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Dealer:     Bust" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "23         8 5 K" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "The cards J Q K" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "are worth 10" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "An Ace (A) is" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "worth 11 or 1" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "See what happens" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "With an A and 10" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Or five cards" );
+  lcd.setCursor( 0, 1 );
+  lcd.print( "below 21" );
+  while (BUTTON_SELECT != ReadButtons());
+  clear_lcd();
+  lcd.setCursor( 0, 0 );
+  lcd.print( "Good luck!" );
   while (BUTTON_SELECT != ReadButtons());
 }
 
 
-
+/*--------------------------------------------------------------------------------------
+  how_to()
+  Simple function that clears the LCD screen. Can be called from anywhere to remove old text from screen.
+  --------------------------------------------------------------------------------------*/
 void clear_lcd() {
   lcd.setCursor( 0, 0 );
   lcd.print( "                " );
@@ -457,9 +611,12 @@ void clear_lcd() {
 
 /*--------------------------------------------------------------------------------------
   ReadButtons()
-  Detect the button pressed and return the value
-  Uses global values buttonWas, buttonJustPressed, buttonJustReleased.
-
+  Description:
+    Detect the button pressed and return the value. Only returns a value on a rising edge once debounced.
+  Inputs:
+    User input through buttons connected in a voltage ladder to A0 ADC.
+  Outputs:
+    Returns a byte indicating the button pressed.
   --------------------------------------------------------------------------------------*/
 byte ReadButtons()
 {
@@ -570,4 +727,3 @@ byte query_user_input(byte one_x, byte one_y, byte two_x, byte two_y)
   } while (BUTTON_SELECT != button_pressed);
   return option_selected;
 }
-
