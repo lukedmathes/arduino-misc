@@ -156,6 +156,30 @@
   Variables
   --------------------------------------------------------------------------------------*/
 const char * const cards_strings[] = { "F", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+
+const char * const tutorial_strings[] = {"  How to play", "  Press select",
+                                        "Select Hit to", "draw a new card",
+                                        "Try to get your", "total to 21",
+                                        "But if you go", "over, you bust!",
+                                        "Try it now.", "Select Hit",
+                                        "Player: *Hit Sit", "11           6 5",
+                                        "11 is a bit low", "Try choosing Hit",
+                                        "Player:  Hit Sit", "21        10 6 5",
+                                        "Good job, 21!", "Now select Sit.",
+                                        "Player: *Hit Sit", "21        10 6 5",
+                                        "Player:     Bust", "28      7 10 6 5",
+                                        "Oh no, Bust!", "Try choosing Sit",
+                                        "Not a bad first", "hand.",
+                                        "You don't always", "need exactly 21",
+                                        "You just have to", "beat the dealer",
+                                        "Dealer:      Hit", "15           5 K",
+                                        "Dealer:     Bust", "23         8 5 K",
+                                        "The cards J Q K", "are worth 10",
+                                        "An Ace (A) is", "worth 11 or 1",
+                                        "See what happens", "With an A and 10",
+                                        "Or five cards", "below 21",
+                                        "Good luck!", ""};
+                                        
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
   --------------------------------------------------------------------------------------*/
@@ -438,166 +462,97 @@ void draw_and_print( byte *card, byte *cursor_pointer )
   (*cursor_pointer) -= 2;
 }
 
-
 /*--------------------------------------------------------------------------------------
   how_to()
-  A short instructional on how to play
+  Description:
+    A short instructional on how to play
 
   --------------------------------------------------------------------------------------*/
 void how_to() {
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "  How to play" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "  Press select" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Select Hit to" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "draw a new card" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Try to get your" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "total to 21" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "But if you go" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "over, you bust!" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Try it now." );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "Select Hit" );
-  while (BUTTON_SELECT != ReadButtons());
+  byte i = 0;
+  for ( i = 0; 10 > i; i++)
+  {
+    tutorial_print(i++);
+    while (BUTTON_SELECT != ReadButtons());
+  }
   while(1)
   {
-    clear_lcd();
-    lcd.setCursor( 0, 0 );
-    lcd.print( "Player: *Hit Sit" );
-    lcd.setCursor( 0, 1 );
-    lcd.print( "11           6 5" );
+    // "Player: *Hit Sit"
+    // "11           6 5"
+    tutorial_print(10);
     if( OPTION_ONE == query_user_input( 8, 0, 12, 0 ) )
     {
       break;
     }
     else
     {
-      clear_lcd();
-     lcd.setCursor( 0, 0 );
-      lcd.print( "11 is a bit low" );
-      lcd.setCursor( 0, 1 );
-      lcd.print( "Try choosing Hit" );
+      // "11 is a bit low"
+      // "Try choosing Hit"
+      tutorial_print(12);
       while (BUTTON_SELECT != ReadButtons());
     }
   }
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Player:  Hit Sit" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "21        10 6 5" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Good job, 21!" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "Now select Sit." );
-  while (BUTTON_SELECT != ReadButtons());
+  for ( i = 14; 18 > i; i++)
+  {
+    tutorial_print(i++);
+    while (BUTTON_SELECT != ReadButtons());
+  }
+
   while(1)
   {
-    clear_lcd();
-    lcd.setCursor( 0, 0 );
-    lcd.print( "Player: *Hit Sit" );
-    lcd.setCursor( 0, 1 );
-    lcd.print( "21        10 6 5" );
+    // "Player: *Hit Sit"
+    // "21        10 6 5"
+    tutorial_print(18);
     if( OPTION_TWO == query_user_input( 8, 0, 12, 0 ) )
     {
       break;
     }
     else
     {
-      clear_lcd();
-      lcd.setCursor( 0, 0 );
-      lcd.print( "Player:     Bust" );
-      lcd.setCursor( 0, 1 );
-      lcd.print( "28      7 10 6 5" );
+      // "Player:     Bust"
+      // "28      7 10 6 5"
+      tutorial_print(20);
       while (BUTTON_SELECT != ReadButtons());
-      
-      clear_lcd();
-      lcd.setCursor( 0, 0 );
-      lcd.print( "Oh no, Bust!" );
-      lcd.setCursor( 0, 1 );
-      lcd.print( "Try choosing Sit" );
+
+      // "Oh no, Bust!"
+      // "Try choosing Sit"
+      tutorial_print(22);
       while (BUTTON_SELECT != ReadButtons());
     }
   }
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Not a bad first" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "hand." );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "You don't always" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "need exactly 21" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "You just have to" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "beat the dealer" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Dealer:      Hit" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "15           5 K" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Dealer:     Bust" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "23         8 5 K" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "The cards J Q K" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "are worth 10" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "An Ace (A) is" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "worth 11 or 1" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "See what happens" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "With an A and 10" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Or five cards" );
-  lcd.setCursor( 0, 1 );
-  lcd.print( "below 21" );
-  while (BUTTON_SELECT != ReadButtons());
-  clear_lcd();
-  lcd.setCursor( 0, 0 );
-  lcd.print( "Good luck!" );
-  while (BUTTON_SELECT != ReadButtons());
+  for ( i = 24; 44 > i; i++)
+  {
+    tutorial_print(i++);
+    while (BUTTON_SELECT != ReadButtons());
+  }
+
+}
+
+/*--------------------------------------------------------------------------------------
+  tutorial_print()
+  Description:
+    A function that takes a reference to the string array "tutorial_strings". Function prints
+    the appropriate string to the LCD screen.
+  Inputs:
+    Reference to which string in tutorial_strings should be printed.
+  Outputs:
+    Prints referenced string to LCD screen.
+  --------------------------------------------------------------------------------------*/
+void tutorial_print(byte string_reference)
+{
+    clear_lcd();
+    lcd.setCursor( 0, 0 );
+    lcd.print( tutorial_strings[string_reference] );
+    lcd.setCursor( 0, 1 );
+    lcd.print( tutorial_strings[string_reference+1] );
+
+    // Not always necessary, so calling function will handle pause
+    //while (BUTTON_SELECT != ReadButtons());
 }
 
 
 /*--------------------------------------------------------------------------------------
-  how_to()
+  clear_lcd()
   Simple function that clears the LCD screen. Can be called from anywhere to remove old text from screen.
   --------------------------------------------------------------------------------------*/
 void clear_lcd() {
