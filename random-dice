@@ -17,7 +17,7 @@
   number, the dice to be rolled, and the "Roll" option. Pressing select or up on a number or die
   will increase it until it loops around from maximum. Pressing down will reduce it until it loops
   from minimum. Pressing select on "Roll" will change the numbers on the second row.
-       
+
        ------------------
        |     3 D6  *Roll|
        |5 1 6           |
@@ -27,7 +27,7 @@
   of the numbers are 3 characters such as with 100 for a D100 or a 10 of any suit for a card. In this
   case, the last card or roll will be placed at the start of the first row. If last number will not
   go off screen, it is still placed at end of screen.
-  
+
        ------------------
        |10S *5 Card Roll|
        |10H 10D 10C 10D |
@@ -36,8 +36,8 @@
        ------------------
        |    *5 Card Roll|
        |10 10D 10C 10D 1|
-       ------------------       
-  
+       ------------------
+
   -----------------------------------------------------------------------
 
   The LCD and keypad shield for Arduino uses the following pins to drive the LCD and button inputs.
@@ -123,10 +123,14 @@
 /*--------------------------------------------------------------------------------------
   Variables
   --------------------------------------------------------------------------------------*/
-  int8_t loop_state = NUMBER_STATE;
+int8_t loop_state = NUMBER_STATE;
 
-  const byte dice_type_values[] = { 4, 6, 10, 12, 20, 100};
-  const byte cursor_locations[] = { SCREEN_CURSOR_NUMBER, SCREEN_CURSOR_TYPE, SCREEN_CURSOR_ROLL };
+const byte dice_type_values[] = { 4, 6, 10, 12, 20, 100, 13}; // 13 is only used for cards and never printed
+
+const char * const cards_strings[] = { "F", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
+const char card_suit[] = { 'H', 'S', 'C', 'D' };
+
+const byte cursor_locations[] = { SCREEN_CURSOR_NUMBER, SCREEN_CURSOR_TYPE, SCREEN_CURSOR_ROLL };
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
   --------------------------------------------------------------------------------------*/
@@ -171,7 +175,7 @@ void loop() {
     default:
       clear_lcd();
       lcd.print("ERROR, STATE");
-      while(1);
+      while (1);
   }
 }
 
@@ -214,14 +218,14 @@ void selection_input( int8_t * changed_var, const byte maximum_val)
       {
         *changed_var = 0;
       }
-      
+
       // Function only called in number_state or type_state, so check global
       if (NUMBER_STATE == loop_state)
       {
         // Print numbers to number location on screen
         lcd.setCursor( SCREEN_LOCATION_NUMBER, 0 );
-        // Number stored in 
-        lcd.print((*changed_var)+1);
+        // Number stored in
+        lcd.print((*changed_var) + 1);
         return;
       }
       // Must be printing dice or card type
@@ -237,7 +241,7 @@ void selection_input( int8_t * changed_var, const byte maximum_val)
       lcd.print("D");
       lcd.print(dice_type_values[*changed_var]);
       return;
-      
+
     // If user presses left or right, pass to state_handler
     case BUTTON_LEFT:
       state_handler(STATE_LEFT);
@@ -245,13 +249,13 @@ void selection_input( int8_t * changed_var, const byte maximum_val)
     case BUTTON_RIGHT:
       state_handler(STATE_RIGHT);
       return;
-        
+
     // Most loops of function will come here and do nothing
     case BUTTON_NONE:
     default:
       return;
   }
-      
+
 }
 
 /*--------------------------------------------------------------------------------------
@@ -263,12 +267,12 @@ void selection_input( int8_t * changed_var, const byte maximum_val)
   Outputs:
 
   --------------------------------------------------------------------------------------*/
-void roll_function( int8_t number_rolls, int8_t dice_type )
+void roll_function( const int8_t number_rolls, const int8_t dice_type )
 {
   switch (ReadButtons())
   {
-    case BUTTON_SELECT: 
-      // MAIN RANDOMISE CODE
+    case BUTTON_SELECT:
+      print_randoms( number_rolls, dice_type);
       return;
     case BUTTON_LEFT:
       state_handler(STATE_LEFT);
@@ -276,7 +280,7 @@ void roll_function( int8_t number_rolls, int8_t dice_type )
     case BUTTON_RIGHT:
       state_handler(STATE_RIGHT);
       return;
-      
+
     // Up and down do not do anything in this state
     case BUTTON_UP:
     case BUTTON_DOWN:
@@ -285,6 +289,40 @@ void roll_function( int8_t number_rolls, int8_t dice_type )
       return;
   }
 }
+
+
+void print_randoms( const int8_t number_rolls, const int8_t dice_type)
+{
+  // Randomise seed based on microseconds since startup on every request
+  randomSeed(micros());
+  // Store value locally to prevent repeated lookups
+  byte dice_type_max = dice_type_values[dice_type];
+  // Random function uses exclusive max, increment here to save mathematics on every call
+  dice_type_max++;
+  // Clear old random values and set cursor
+  lcd.setCursor( 0, 0 );
+  lcd.print("   ");
+  lcd.setCursor( 0, 1 );
+  lcd.print("                ");
+  lcd.setCursor( 0, 1 );
+  for ( int i = 0; number_rolls >= i; i++)
+  {
+    if ( 14 != dice_type_max )    // Not a card
+    {
+      // Print random number up to maximum
+      lcd.print(random( 1, dice_type_max));
+    }
+    else
+    {
+      // Print random suit, followed by random card number
+      lcd.print(card_suit[random(4)]);
+      lcd.print(cards_strings[random(1, dice_type_max)]);
+    }
+    lcd.print(" ");
+  }
+}
+
+
 
 
 /*--------------------------------------------------------------------------------------
@@ -302,7 +340,7 @@ void roll_function( int8_t number_rolls, int8_t dice_type )
 void state_handler( byte change_state )
 {
   // Clear all cursor locations
-  for ( byte i=0; 3 > i; i++ )
+  for ( byte i = 0; 3 > i; i++ )
   {
     lcd.setCursor( cursor_locations[i], 0 );
     lcd.print(" ");
@@ -317,7 +355,7 @@ void state_handler( byte change_state )
   {
     loop_state = 0;
   }
-  
+
   // Print cursor to screen at new location.
   lcd.setCursor( cursor_locations[loop_state], 0 );
   lcd.print("*");
@@ -393,7 +431,7 @@ byte ReadButtons()
     buttonWas = button;
     return ( button );
   }
-  
+
   // If not a rising edge debounce, return nothing
   return ( BUTTON_NONE );
 }
