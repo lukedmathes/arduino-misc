@@ -123,13 +123,18 @@
 /*--------------------------------------------------------------------------------------
   Variables
   --------------------------------------------------------------------------------------*/
+// Global loop state variable. Read from main loop and selection_input, only changed from state_handler().
 int8_t loop_state = NUMBER_STATE;
 
-const byte dice_type_values[] = { 4, 6, 10, 12, 20, 100, 13}; // 13 is only used for cards and never printed
+// Dice type values, used for printing to screen and as maximum for generating random numbers
+// 13 is only used for cards and never printed
+const byte dice_type_values[] = { 4, 6, 10, 12, 20, 100, 13};
 
+// String and character arrays used for printing cards
 const char * const cards_strings[] = { "F", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"};
 const char card_suit[] = { 'H', 'S', 'C', 'D' };
 
+// Cursor locations used for easy lookup in state_handler function
 const byte cursor_locations[] = { SCREEN_CURSOR_NUMBER, SCREEN_CURSOR_TYPE, SCREEN_CURSOR_ROLL };
 /*--------------------------------------------------------------------------------------
   Init the LCD library with the LCD pins to be used
@@ -148,7 +153,7 @@ void setup() {
   pinMode( LCD_BACKLIGHT_PIN, OUTPUT );     //D3 is an output
   //set up the LCD number of columns and rows:
   lcd.begin( 16, 2 );
-
+  // Print initial screen
   lcd.setCursor( 0, 0 );
   lcd.print( "    *1 D4   Roll" );
 }
@@ -163,6 +168,8 @@ void loop() {
 
   switch (loop_state)
   {
+    // Run appropriate function depending on current state
+    // State is changed through state_handler function called from each below function
     case NUMBER_STATE:
       selection_input(&number_rolls, ROLL_MAXIMUM);
       break;
@@ -261,26 +268,31 @@ void selection_input( int8_t * changed_var, const byte maximum_val)
 /*--------------------------------------------------------------------------------------
   roll_function()
   Description:
-
+    Handlers user input when system is in "roll" state. Only performs two tasks; changing state
+    on either a left or right button press, and running the rolling numbers function on a select
+    button press.
   Inputs:
-
+    Number of rolls and dice type taken from the main loop.
+    User input through ReadButtons().
   Outputs:
-
+    Changes state through state_handler().
+    Calls print_randoms() and passes arguments
   --------------------------------------------------------------------------------------*/
 void roll_function( const int8_t number_rolls, const int8_t dice_type )
 {
   switch (ReadButtons())
   {
     case BUTTON_SELECT:
+      // Run main random number printing function only when select is pressed
       print_randoms( number_rolls, dice_type);
       return;
+    // If user presses left or right, pass to state_handler
     case BUTTON_LEFT:
       state_handler(STATE_LEFT);
       return;
     case BUTTON_RIGHT:
       state_handler(STATE_RIGHT);
       return;
-
     // Up and down do not do anything in this state
     case BUTTON_UP:
     case BUTTON_DOWN:
@@ -291,12 +303,25 @@ void roll_function( const int8_t number_rolls, const int8_t dice_type )
 }
 
 
+/*--------------------------------------------------------------------------------------
+  print_randoms()
+  Description:
+    Prints the user selected dice/card type the user selected amount of times. Function keeps
+    track of the location of cursor offset by 3 or 1 digit numbers and if a value would run
+    off the end of the screen, it instead is printed in the top-left.
+  Inputs:
+    Number of random values to generate and what type to generate.
+  Outputs:
+    Clears old random values from LCD screen and prints new values.
+  --------------------------------------------------------------------------------------*/
 void print_randoms( const int8_t number_rolls, const int8_t dice_type)
 {
   // Randomise seed based on microseconds since startup on every request
   randomSeed(micros());
   // Store value locally to prevent repeated lookups
   byte dice_type_max = dice_type_values[dice_type];
+  byte random_temp_store = 0;
+  int8_t offset = 0;
   // Random function uses exclusive max, increment here to save mathematics on every call
   dice_type_max++;
   // Clear old random values and set cursor
@@ -305,18 +330,45 @@ void print_randoms( const int8_t number_rolls, const int8_t dice_type)
   lcd.setCursor( 0, 1 );
   lcd.print("                ");
   lcd.setCursor( 0, 1 );
+  // number_rolls is actually 1 less than the number displayed and the number rolled, so >= is used
   for ( int i = 0; number_rolls >= i; i++)
   {
     if ( 14 != dice_type_max )    // Not a card
     {
       // Print random number up to maximum
-      lcd.print(random( 1, dice_type_max));
+      random_temp_store = random( 1, dice_type_max);
+      // Increase offset if value is 100 or a 10 card, and decrease if a single digit (number below 10)
+      if (100 == random_temp_store)
+      {
+        offset++;
+      }
+      if (10 > random_temp_store)
+      {
+        offset--;
+      }
+      // Move cursor to top row if number will run over end of screen
+      if (( 4 <= i ) && (3 <= offset))
+      {
+        lcd.setCursor( 0, 0 );
+      }
+      lcd.print(random_temp_store);
     }
     else
     {
       // Print random suit, followed by random card number
+      // Increase offset if value is 100 or a 10 card, and decrease if a single digit (number below 10)
+      random_temp_store = random( 1, dice_type_max);
+      if (10 == random_temp_store)
+      {
+        offset++;
+      }
+      // Move cursor to top row if number will run over end of screen
+      if (( 4 <= i ) && (3 <= offset))
+      {
+        lcd.setCursor( 0, 0 );
+      }
       lcd.print(card_suit[random(4)]);
-      lcd.print(cards_strings[random(1, dice_type_max)]);
+      lcd.print(cards_strings[random_temp_store]);
     }
     lcd.print(" ");
   }
@@ -347,6 +399,7 @@ void state_handler( byte change_state )
   }
   // Change state is either zero or one to indicate left or right
   loop_state += change_state;
+  // If state has gone out of range due to change_state modification, loop it around into range
   if ( 0 > loop_state )
   {
     loop_state = 2;
@@ -356,7 +409,7 @@ void state_handler( byte change_state )
     loop_state = 0;
   }
 
-  // Print cursor to screen at new location.
+  // Print cursor to screen at new location. Constant array with locations is used to save branching
   lcd.setCursor( cursor_locations[loop_state], 0 );
   lcd.print("*");
 }
